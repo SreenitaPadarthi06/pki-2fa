@@ -4,7 +4,8 @@ import os
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization, hashes
 
-from totp_utils import generate_totp_code, verify_totp_code
+from totp_utils import generate_totp, verify_totp
+
 
 app = FastAPI()
 
