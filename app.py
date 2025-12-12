@@ -1,15 +1,14 @@
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os
+import base64
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization, hashes
-
 from totp_utils import generate_totp, verify_totp
-
 
 app = FastAPI()
 
-# Correct paths inside Docker
 ENCRYPTED_SEED = "/app/encrypted_seed.txt"
 STUDENT_PRIVATE_KEY = "/app/student_private.pem"
 OUTPUT_SEED_FILE = "/data/seed.txt"
@@ -18,37 +17,43 @@ class Code(BaseModel):
     code: str
 
 def decrypt_seed():
-    """Decrypts encrypted_seed.txt and writes seed.txt into /data."""
+    # read base64 encrypted_seed.txt, decode, then decrypt using RSA-OAEP-SHA256
     if not os.path.exists(ENCRYPTED_SEED):
         raise Exception("Encrypted seed file missing")
 
     if not os.path.exists(STUDENT_PRIVATE_KEY):
         raise Exception("Private key missing")
 
-    # Load encrypted seed
-    with open(ENCRYPTED_SEED, "rb") as f:
-        encrypted = f.read()
+    with open(ENCRYPTED_SEED, "r") as f:
+        enc_b64 = f.read().strip()
 
-    # Load private key
+    try:
+        encrypted = base64.b64decode(enc_b64)
+    except Exception:
+        raise Exception("Encrypted seed not base64")
+
     with open(STUDENT_PRIVATE_KEY, "rb") as f:
         private_key = serialization.load_pem_private_key(
             f.read(),
             password=None
         )
 
-    # Decrypt
     try:
-        seed = private_key.decrypt(
+        seed_bytes = private_key.decrypt(
             encrypted,
-            padding.PKCS1v15()
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
         )
     except Exception:
         raise Exception("Seed decryption failed")
 
-    # Convert bytes → hex
-    hex_seed = seed.hex()
+    hex_seed = seed_bytes.decode("utf-8")
+    if len(hex_seed) != 64:
+        raise Exception("Invalid seed length")
 
-    # Store decrypted seed
     os.makedirs("/data", exist_ok=True)
     with open(OUTPUT_SEED_FILE, "w") as f:
         f.write(hex_seed)
@@ -73,8 +78,7 @@ def generate_2fa():
     with open(OUTPUT_SEED_FILE, "r") as f:
         hex_seed = f.read().strip()
 
-    code = generate_totp_code(hex_seed)
-
+    code = generate_totp(hex_seed)
     return {"code": code}
 
 
@@ -89,5 +93,6 @@ def verify_2fa(c: Code):
     with open(OUTPUT_SEED_FILE, "r") as f:
         hex_seed = f.read().strip()
 
-    valid = verify_totp_code(hex_seed, c.code)
+    valid = verify_totp(hex_seed, c.code)
     return {"valid": valid}
+
