@@ -16,3 +16,6 @@ __pycache__/
 # Editor configs
 .vscode/
 .idea/
+commit.enc
+commit.txt
+commit_signature.txt
