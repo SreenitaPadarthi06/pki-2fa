@@ -27,9 +27,10 @@ COPY . /app
 ENV PYTHONPATH=/app
 
 # Ensure cron script is executable and install crontab
-RUN chmod 755 /app/cron/log_2fa_cron.py && \
+RUN chmod 755 /app/scripts/log_2fa_cron.py && \
     chmod 644 /app/cron/2fa-cron && \
     crontab /app/cron/2fa-cron
+
 
 # Create persistent mount points
 RUN mkdir -p /data /cron && chmod 755 /data /cron
