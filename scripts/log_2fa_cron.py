@@ -4,8 +4,8 @@ import sys
 import os
 import datetime
 
-# Allow imports from /app
-sys.path.append("/app")
+# Ensure /app is in Python path for cron
+sys.path.insert(0, "/app")
 
 from totp_utils import generate_totp
 
@@ -26,4 +26,5 @@ try:
         out.write(f"{timestamp} - 2FA Code: {code}\n")
 
 except Exception as e:
-    sys.stderr.write(str(e) + "\n")
+    with open("/cron/cron_error.log", "a") as err:
+        err.write(str(e) + "\n")
